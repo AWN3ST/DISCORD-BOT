@@ -19,7 +19,9 @@ import json
 
 token = ('')
 client = commands.Bot('!')
+daily_spin_date = {}
 jahcoins = {}
+client.jahcoins = {}
 jahcoin_emoji = '<:jahcoin2:600180930761588747>'
 
 
@@ -27,136 +29,132 @@ jahcoin_emoji = '<:jahcoin2:600180930761588747>'
 #This tells you that the bot is loaded and working
 async def on_ready():
     print("Bot is loaded.")
-    global jahcoins
     try:
         with open('jahcoins.json') as f:
-            jahcoins = json.load(f)
-    except FileNotFoundError:
-        print("Could not load jahcoins.json")
-        jahcoins = {}
+            client.jahcoins = json.load(f)
+    except (FileNotFoundError, json.decoder.JSONDecodeError) as e:
+        print("Couldn't load jahcoins.json, likely because file is empty")
+        with open('jahcoins.json', 'w') as f:
+            f.write("{}")
+        client.jahcoins = {} 
 
-@client.command()
+
+@client.command(aliases = ['balance'])
 async def bal(ctx):
     channel = ctx.message.channel
-    id = ctx.message.author.id
-    if id in jahcoins:
-        await channel.send(f"You have {(jahcoins[id])}{jahcoin_emoji} {ctx.message.author.mention}")
-    else:
-        await channel.send(f"You do not have an account, please make one by typing !register {ctx.message.author.mention}")
+    id_ = str(ctx.message.author.id)
+    if id_ in client.jahcoins:
+        await ctx.send(f"You have {(client.jahcoins[id_]['coins'])}{jahcoin_emoji} {ctx.message.author.mention}")
+        _save()
+    elif id_ not in client.jahcoins:
+        await ctx.send(f"You do not have an account, please make one by typing !register {ctx.message.author.mention}")
 
 
 @client.command()
 async def gamble(ctx, gamble_amount: int):
     channel = ctx.message.channel
-    id = ctx.message.author.id
-    if id in jahcoins:
+    id_ = str(ctx.message.author.id)
+    if id_ in client.jahcoins:
         random_number = random.randint(0,100)
         correct_number = random.randint(0,100)
         gamble_amount = int(ctx.message.content[8:])
-        if gamble_amount > jahcoins[id]:
-            await channel.send(f"You don't have enough! You have {(jahcoins[id])}{jahcoin_emoji} when you tried betting {gamble_amount}{jahcoin_emoji} {ctx.message.author.mention}")
-        elif gamble_amount <= jahcoins[id]:
+        if gamble_amount > client.jahcoins[id_]["coins"]:
+            await channel.send(f"You don't have enough! You have {(client.jahcoins[id_]['coins'])}{jahcoin_emoji} when you tried betting {gamble_amount}{jahcoin_emoji} {ctx.message.author.mention}")
+        elif gamble_amount <= client.jahcoins[id_]["coins"]:
             if random_number < correct_number:
-                jahcoins[id] += gamble_amount
+                client.jahcoins[id_]["coins"] += gamble_amount
                 _save()
-                await channel.send(f'You won! Congratulations, you now have {(jahcoins[id])}{jahcoin_emoji} {ctx.message.author.mention}')
+                await channel.send(f'You won! Congratulations, you now have {(client.jahcoins[id_]["coins"])}{jahcoin_emoji} {ctx.message.author.mention}')
             elif random_number > correct_number:
-                jahcoins[id] -= gamble_amount
+                client.jahcoins[id_]["coins"] -= gamble_amount
                 _save()
-                await channel.send(f'Unfortunately you lost, you now have {(jahcoins[id])}{jahcoin_emoji} {ctx.message.author.mention}')
+                await channel.send(f'Unfortunately you lost, you now have {(client.jahcoins[id_]["coins"])}{jahcoin_emoji} {ctx.message.author.mention}')
 
 @client.command()
 @commands.cooldown(1, 60*60*24, commands.BucketType.user)
 async def dailyspin(ctx):
+    from collections import namedtuple
+    results_template = namedtuple("result", ["percent", "amount", "message"])
     channel = ctx.message.channel
-    id = ctx.message.author.id
-    if id in jahcoins:
-            random_number = random.uniform(0.0, 100.0)
-            await channel.send('You spin the wheel really fast. . .')
-            time.sleep(0.75)
-            await channel.send('The wheel continues to spin fast. . .')
-            time.sleep(0.75)
-            await channel.send('The wheel begins to slow down. . .')
-            time.sleep(0.75)
-            await channel.send('The wheel is just about to stop. . .')
-            time.sleep(0.75)
-            if random_number <= 5.0:
-                won_amount = int(5000)
-                jahcoins[id] += won_amount
-                _save()
-                await channel.send(f'The wheel finally stops and with a 5% chance,\nyou won {won_amount}{jahcoin_emoji} for your daily spin, consider yourself lucky!\n\nYour new balance is - {(jahcoins[id])}{jahcoin_emoji} {ctx.message.author.mention}')
-            elif random_number <= 10.0:
-                won_amount = int(2500)
-                jahcoins[id] += won_amount
-                _save()
-                await channel.send(f'The wheel finally stops and with a 10% chance,\nyou won {won_amount}{jahcoin_emoji} for your daily spin, consider yourself kinda lucky!\n\nYour new balance is: {(jahcoins[id])}{jahcoin_emoji} {ctx.message.author.mention}')
-            elif random_number <= 20.0:
-                won_amount = int(1250)
-                jahcoins[id] += won_amount
-                _save()
-                await channel.send(f'The wheel finally stops and with a 20% chance,\nyou won {won_amount}{jahcoin_emoji} for your daily spin, you were semi-lucky!\n\nYour new balance is: {(jahcoins[id])}{jahcoin_emoji} {ctx.message.author.mention}')
-            elif random_number <= 30.0:
-                won_amount = int(800)
-                jahcoins[id] += won_amount
-                _save()
-                await channel.send(f'The wheel finally stops and with a 30% chance,\nyou won {won_amount}{jahcoin_emoji} for your daily spin, decent spin, good job!\n\nYour new balance is: {(jahcoins[id])}{jahcoin_emoji} {ctx.message.author.mention}')
-            elif random_number <= 50.0:
-                won_amount = int(500)
-                jahcoins[id] += won_amount
-                _save()
-                await channel.send(f'The wheel finally stops and with a 50% chance,\nyou won {won_amount}{jahcoin_emoji} for your daily spin, OK spin, see you tomorrow!\n\nYour new balance is: {(jahcoins[id])}{jahcoin_emoji} {ctx.message.author.mention}')
-            elif random_number <= 75.0:
-                won_amount = int(250)
-                jahcoins[id] += won_amount
-                _save()
-                await channel.send(f'The wheel finally stops and with a 75% chance,\nyou won {won_amount}{jahcoin_emoji} for your daily spin, bad spin, better luck tomorrow!\n\nYour new balance is: {(jahcoins[id])}{jahcoin_emoji} {ctx.message.author.mention}')
-            elif random_number <= 100.0:
-                won_amount = int(100)
-                jahcoins[id] += won_amount
-                _save()
-                await channel.send(f'The wheel finally stops and with a 100% chance,\nyou won {won_amount}{jahcoin_emoji} for your daily spin, TERRIBLE SPIN, better luck tomorrow!\n\nYour new balance is: {(jahcoins[id])}{jahcoin_emoji} {ctx.message.author.mention}')
+    id_ = str(ctx.message.author.id)
+    if id_ in client.jahcoins:
+        random_number = random.uniform(0.0, 100.0)
+        await channel.send('You spin the wheel really fast. . .')
+        await asyncio.sleep(0.75)
+        await channel.send('The wheel continues to spin fast. . .')
+        await asyncio.sleep(0.75)
+        await channel.send('The wheel begins to slow down. . .')
+        await asyncio.sleep(0.75)
+        await channel.send('The wheel is just about to stop. . .')
+        await asyncio.sleep(0.75)
+        if random_number <= 5.0:
+            result = results_template(5, 5000, "INCREDLBE LUCK!")
+        elif random_number <= 10.0:
+            result = results_template(10, 2500, "INSANE!")
+        elif random_number <= 20.0:
+            result = results_template(20, 1250, "Good job!")
+        elif random_number <= 30.0:
+            result = results_template(30, 800, "Not too shabby!")
+        elif random_number <= 50.0:
+            result = results_template(50, 500, "could have been better...")
+        elif random_number <= 75.0:
+            result = results_template(75, 250, "Not the worst...")
+        elif random_number <= 100.0:
+            result = results_template(100, 100, "the worst, better luck tomorrow!")
+        client.jahcoins[id_]["coins"] += (result.amount)
+        await ctx.send(f"The wheel finally stops and with a {result.percent}% chance, you won {result.amount}{jahcoin_emoji} for your daily spin,\n {result.message}!\n\nYour new balance is: {(client.jahcoins[id_]['coins'])}{jahcoin_emoji}{ctx.message.author.mention}")
+        _save()
+        
 
-    if id not in jahcoins:
-            await channel.send(f"You don't have an account! Please type !register to make an account {ctx.message.author.mention}")
+    if id_ not in client.jahcoins:
+            await ctx.send(f"You don't have an account! Please type !register to make an account {ctx.message.author.mention}")
+            return
 
-'''@dailyspin.error
+@dailyspin.error
 async def dailyspin_error(ctx, error):
+    id_ = str(ctx.message.author.id)
     if isinstance(error, commands.CommandOnCooldown):
-        await ctx.send("Error")'''
+        #client.jahcoins[id_]["next_time"] = time.time() - next_time() > 246060
+        await ctx.send(f"You already had your daily, your next spin will be in {round(error.retry_after / 60)} minutes")
+    
 
 
 @client.command()
 async def register(ctx):
-    id = ctx.message.author.id
+    id_ = str(ctx.message.author.id)
     channel = ctx.message.channel
-    if id not in jahcoins:
-        jahcoins[id] = 100
+    if id_ not in jahcoins:
+        client.jahcoins[id_] = {"coins": 100, "next_time": 0}
         await channel.send(f"You are now registered and have been given 100{jahcoin_emoji} {ctx.message.author.mention}")
         _save()
     else:
         await channel.send(f"You already have an account {ctx.message.author.mention}")
 
 @client.command()
-async def give(ctx, other: discord.Member, jahcoin: int, error):
+async def give(ctx, other: discord.Member, jahcoin: int):
     channel = ctx.message.channel
-    primary_id = ctx.message.author.id
-    other_id = other.id
-    if primary_id not in jahcoins:
-        await channel.send(f"You do not have an account, create one by typing !register {ctx.message.author.mention}")
-    elif other_id not in jahcoins:
-        await channel.send(f"The other party {other.mention} does not have an account, he/or she needs to type !register {ctx.message.author.mention}")
-    elif jahcoins[primary_id] < jahcoin:
-        await channel.send(f"You cannot afford to give {other.mention} {jahcoin}{jahcoin_emoji} because you only have {jahcoins[primary_id]}{jahcoin_emoji} {ctx.message.author.mention}")
+    primary_id = str(ctx.message.author.id)
+    other_id = str(other.id)
+    if primary_id not in client.jahcoins:
+        await ctx.send(f"You do not have an account, create one by typing !register {ctx.message.author.mention}")
+    elif other_id not in client.jahcoins:
+        await ctx.send(f"The other party {other.mention} does not have an account, he/or she needs to type !register {ctx.message.author.mention}")
+    elif client.jahcoins[primary_id]['coins'] < jahcoin:
+        await ctx.send(f"You cannot afford to give {other.mention} {jahcoin}{jahcoin_emoji} because you only have {(client.jahcoins[primary_id]['coins'])}{jahcoin_emoji} {ctx.message.author.mention}")
     else:
-        jahcoins[primary_id] -= jahcoin
-        jahcoins[other_id] += jahcoin
-        await channel.send(f"Transaction complete.\n\n{other.mention} new balance is: {jahcoins[other_id]}{jahcoin_emoji}\n\n{ctx.message.author.mention} new balance is: " +
-                                  f"{jahcoins[primary_id]}{jahcoin_emoji}")
+        client.jahcoins[primary_id]['coins'] -= jahcoin
+        client.jahcoins[other_id]['coins'] += jahcoin
+        await ctx.send(f"Transaction complete.\n\n{other.mention} new balance is: {(client.jahcoins[other_id]['coins'])}{jahcoin_emoji}\n\n{ctx.message.author.mention} new balance is: " +
+                                  f"{(client.jahcoins[primary_id]['coins'])}{jahcoin_emoji}")
     _save()
 
-def _save():
-    with open('jahcoins.json', 'w+') as f:
-        json.dump(jahcoins, f)
+@give.error
+async def give_error(ctx, error):
+    id_ = ctx.message.author.id
+    if isinstance(error, commands.BadArgument):
+        await ctx.send("**\nBAD INPUT**\n\nRemember !give @USER_NAME (amount)")
+
+
 
 @client.command()
 async def jahcoin(ctx):
@@ -164,48 +162,19 @@ async def jahcoin(ctx):
     embed = discord.Embed(title = "How to use Jahcoin Currency", color = 0xdaa520)
     embed.set_thumbnail(url="https://cdn.discordapp.com/attachments/593203992541003807/600183870520033281/exclamation.png")
     embed.add_field(name = "=== Registering ===", value = "First thing first is to register an account by typing **!register**.\nThis will register you into the database and start you out with 100 Jahcoin(s).", inline = True)
-    embed.add_field(name = "=== Gambling ===", value = " You can gamble your jahcoin by typing **!gamble (amount to gamble)**. If you win, the amount you gambled will be added to your balance, if you lose the amount\nyou gambled will be taken away.", inline = True)
+    embed.add_field(name = "=== Gambling ===", value = " You can gamble your jahcoin by typing **!gamble (amount to gamble)**. If you win, the amount you gambled will be added to your balance, if you lose the amount, you gambled will be taken away.", inline = True)
     embed.add_field(name = "=== Daily Spin ===", value = "You can have a daily spin by typing **!dailyspin**.", inline = True)
     embed.add_field(name = "=== Checking your Balance ===", value = "To check your balance simply type **!bal**.", inline = True)
     embed.add_field(name = "=== Giving ===", value = "Feeling generous? Give some of your {jahcoin_emoji} to another user by\ntyping **!give (amount) @USER**.", inline = True)
+    embed.add_field(name = "=== Balance ===", value = "Checking your balance is simple, type either **!bal** or **!balance**.", inline = True)
     
     await channel.send(content=None, embed=embed)
 
 
-@client.command()
-async def save():
-    _save()
 
-
-'''async def background_loop():
-    await client.wait_until_ready()
-    while not client.is_closed:
-        channel = client.get_channel("")
-        
-        twitter_status = 'https://twitter.com/i/web/status/'
-        username = "wojespn"
-
-        CONSUMER_KEY = ''
-        CONSUMER_SECRET = ''
-        ACCESS_KEY = ''
-        ACCESS_SECRET = ''
-
-        auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
-        auth.set_access_token(ACCESS_KEY, ACCESS_SECRET)
-        api = tweepy.API(auth)
-
-        while True:
-            for status in api.user_timeline(username, count = 1):
-                current_status = status.id
-                latest_tweet = (twitter_status + str(current_status))
-                print(latest_tweet)
-                time.sleep(3)
-                    
-           
-            await client.send_message(channel, latest_tweet)
-            await asyncio.sleep(3)
-
-client.loop.create_task(background_loop())'''
+def _save():
+    with open('jahcoins.json', 'w') as f:
+        json.dump(client.jahcoins, f)
 
 
 @client.command()
@@ -225,18 +194,17 @@ async def cmds(ctx):
 
         
 
-@client.event
-async def on_message(message):
+@client.command(name = "8ball")
+async def _8ball(ctx):
         responses = ['It is certain.','It is decidedly so.','Without a doubt','Yes - definitely',
                         'You may rely on it.','As I see it, yes.','Most likely.','Outlook good.','Yes.',
                         'Signs point to yes.','Reply hazy, try again','Ask again later','Better not tell you now',
                         'Cannot predict now.','Concentrate and ask again','Do not count on it','My reply is no.',
                         'My sources say no.','Outlook not so good.','Very doubtful.']
         channel = message.channel
-        if message.content.upper().startswith('!8BALL'):
-            await channel.send(random.choice(responses) + f" {message.author.mention}")
+        
+        await ctx.send(random.choice(responses) + f" {message.author.mention}")
 
-        await client.process_commands(message)
 
         
 
@@ -261,9 +229,9 @@ async def say(ctx):
 @client.command()
 async def gmall(ctx):
         channel = ctx.message.channel
-        if ctx.message.author.id == '143583362508914688':
-            await channel.send("Good morning Bobby Shmelter nation! <@121441376561790976>\n" + "Good morning Carbon nation! <@338154331897593866>\n"
-                                        + "Good morning seb nation! <@121333924529045504>\n" + "Good morning Tazz Nation! <@121045727299239937>\n" + "Good morning ramsey nation! <@148931357941301248>")
+        if ctx.message.author.id == '':
+            await channel.send("Good morning Bobby Shmelter nation! <@>\n" + "Good morning Carbon nation! <@>\n"
+                                        + "Good morning seb nation! <@>\n" + "Good morning Tazz Nation! <@>\n" + "Good morning ramsey nation! <@>")
 
 
 @client.command()
@@ -328,6 +296,4 @@ client.run(token)
 
 
             
-        
-
-
+      
